@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <title>将棋</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+      button, [role="button"], select, summary { min-height: 2.25rem; }
+      * { box-sizing: border-box; }
+      :root{
+        --bg:#f4efe6; --bg2:#ece3d2; --panel:#fffdf7; --panel2:#f8f2e4;
+        --ink:#2b2118; --ink2:#5d5041; --line:#d8cbb2;
+        --accent:#a4372a; --accent2:#7a5b21; --gold:#b8892e;
+        --wood:#e8bd76; --wood2:#dcab5c; --woodline:#8a6434;
+        --piece:#fbeec3; --piece-edge:#c89b4e; --piece-ink:#33241a;
+        --hl:rgba(38,110,60,.32); --sel:rgba(164,55,42,.28); --last:rgba(60,90,180,.25);
+        --good:#2e6e3e; --bad:#a4372a;
+        --shadow:0 6px 22px rgba(60,40,10,.14);
+      }
+      @media (prefers-color-scheme: dark){
+        :root{
+          --bg:#17130e; --bg2:#1e1811; --panel:#241c13; --panel2:#2a2115;
+          --ink:#efe6d4; --ink2:#bfae93; --line:#453723;
+          --accent:#e0785f; --accent2:#d3a94f; --gold:#d3a94f;
+          --wood:#c99b52; --wood2:#bd8f45; --woodline:#6e4f24;
+          --piece:#f3dfa4; --piece-edge:#a87c34; --piece-ink:#33241a;
+          --hl:rgba(80,200,110,.35); --sel:rgba(255,110,80,.35); --last:rgba(120,160,255,.3);
+          --shadow:0 6px 22px rgba(0,0,0,.45);
+        }
+      }
+      html{ -webkit-text-size-adjust:100%; }
+      body{
+        margin:0; background:linear-gradient(180deg,var(--bg),var(--bg2));
+        color:var(--ink);
+        font-family:"Noto Sans JP", "Hiragino Kaku Gothic ProN", sans-serif;
+        line-height:1.65;
+      }
+      .wrap{ max-width:1120px; margin:0 auto; padding:14px 14px 48px; }
+      .topbar{
+        display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between;
+        margin-bottom:12px;
+      }
+      .topbar h1{
+        font-family:"Noto Serif JP", serif; font-size:1.45rem; margin:0; letter-spacing:.14em;
+      }
+      .topbar h1 small{ font-size:.78rem; letter-spacing:.05em; color:var(--ink2); font-family:"Noto Sans JP",sans-serif; margin-left:.5em; }
+      .controls{ display:flex; flex-wrap:wrap; gap:8px; }
+      .btn{
+        appearance:none; border:1px solid var(--line); background:var(--panel); color:var(--ink);
+        border-radius:8px; padding:8px 14px; font-size:.92rem; font-weight:700; cursor:pointer;
+        font-family:inherit;
+      }
+      .btn:hover{ border-color:var(--gold); }
+      .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+      @media (prefers-color-scheme: dark){ .btn.primary{ color:#1c1008; background:var(--accent); } }
+      .btn:disabled{ opacity:.45; cursor:default; }
+      .layout{ display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:16px; align-items:start; }
+      @media (max-width:880px){ .layout{ grid-template-columns:1fr; } }
+
+      .playerbar{
+        display:flex; align-items:center; gap:10px; background:var(--panel);
+        border:1px solid var(--line); border-radius:10px; padding:8px 12px; box-shadow:var(--shadow);
+      }
+      .playerbar .who{ font-weight:700; white-space:nowrap; }
+      .playerbar .who .mark{ font-family:"Noto Serif JP",serif; }
+      .playerbar.turn{ outline:2px solid var(--gold); }
+      .hand{ display:flex; flex-wrap:wrap; gap:5px; min-height:40px; align-items:center; flex:1; }
+      .hand .none{ color:var(--ink2); font-size:.85rem; }
+      .handpiece{
+        position:relative; width:40px; height:44px; border:none; cursor:pointer; background:transparent; padding:0;
+        display:flex; align-items:center; justify-content:center;
+      }
+      .handpiece .shape{
+        position:absolute; inset:0; background:linear-gradient(180deg,#fdf3cf,var(--piece));
+        clip-path:polygon(50% 0%,88% 14%,100% 100%,0% 100%,12% 14%);
+        border:none; box-shadow:inset 0 0 0 1px var(--piece-edge);
+      }
+      .handpiece .kanji{
+        position:relative; font-family:"Noto Serif JP",serif; font-weight:700; color:var(--piece-ink);
+        font-size:1.15rem; line-height:1; padding-top:5px;
+      }
+      .handpiece .cnt{
+        position:absolute; right:-2px; bottom:-2px; background:var(--accent); color:#fff; z-index:2;
+        font-size:.68rem; font-weight:700; border-radius:999px; min-width:19px; height:19px;
+        display:flex; align-items:center; justify-content:center; padding:0 4px;
+      }
+      .handpiece.selected .shape{ background:linear-gradient(180deg,#ffd9a8,#f7b96a); }
+      .handpiece:disabled{ cursor:default; opacity:.85; }
+
+      .boardzone{ margin:10px 0; }
+      .status{
+        text-align:center; font-weight:700; font-size:1.02rem; min-height:1.8em; margin:2px 0 8px;
+      }
+      .status .check{ color:var(--accent); }
+      .boardframe{
+        background:linear-gradient(145deg,#a4743a,#8a5c28);
+        padding:10px 26px 10px 10px; border-radius:8px; box-shadow:var(--shadow);
+        position:relative; max-width:600px; margin:0 auto;
+      }
+      @media (prefers-color-scheme: dark){ .boardframe{ background:linear-gradient(145deg,#7d5a28,#64451c); } }
+      .files{
+        display:grid; grid-template-columns:repeat(9,1fr); color:#ffe9bb; font-size:.78rem;
+        text-align:center; padding:0 0 4px; font-weight:700;
+      }
+      .boardrow{ display:grid; grid-template-columns:1fr 22px; gap:4px; }
+      .ranks{ display:grid; grid-template-rows:repeat(9,1fr); color:#ffe9bb; font-size:.78rem; text-align:center; align-items:center; font-weight:700; }
+      .board{
+        display:grid; grid-template-columns:repeat(9,1fr); grid-template-rows:repeat(9,1fr);
+        background:linear-gradient(160deg,var(--wood),var(--wood2));
+        border:2px solid #6e4a1e; aspect-ratio:1/1; user-select:none; -webkit-user-select:none;
+        touch-action:manipulation; position:relative;
+      }
+      .sq{
+        border-right:1px solid var(--woodline); border-bottom:1px solid var(--woodline);
+        position:relative; display:flex; align-items:center; justify-content:center; cursor:pointer;
+      }
+      .sq:nth-child(9n){ border-right:none; }
+      .sq:nth-last-child(-n+9){ border-bottom:none; }
+      .sq .dot{
+        position:absolute; width:7px; height:7px; border-radius:50%; background:#6e4a1e; right:-4px; bottom:-4px; z-index:1;
+      }
+      .sq.sel{ background:var(--sel); }
+      .sq.last{ background:var(--last); }
+      .sq.legal::after{
+        content:""; position:absolute; width:34%; height:34%; border-radius:50%;
+        background:var(--hl); border:2px solid rgba(30,90,45,.55); z-index:1; pointer-events:none;
+      }
+      .sq.legal.capture::after{
+        width:88%; height:88%; border-radius:6px; background:rgba(164,55,42,.16);
+        border:2px solid rgba(164,55,42,.65);
+      }
+      .piece{
+        position:relative; z-index:2; width:88%; height:92%;
+        display:flex; align-items:center; justify-content:center; pointer-events:none;
+      }
+      .piece .shape{
+        position:absolute; inset:0;
+        background:linear-gradient(180deg,#fdf3cf 0%,var(--piece) 55%,#f3d68d 100%);
+        clip-path:polygon(50% 0%,88% 13%,100% 100%,0% 100%,12% 13%);
+        filter:drop-shadow(0 1px 1px rgba(80,50,0,.35));
+      }
+      .piece .kanji{
+        position:relative; font-family:"Noto Serif JP",serif; font-weight:900; color:var(--piece-ink);
+        line-height:1; padding-top:12%; text-align:center;
+      }
+      .piece .kanji.one{ font-size:clamp(15px,4.6vw,30px); }
+      .piece .kanji.two{ font-size:clamp(10px,3vw,19px); writing-mode:vertical-rl; letter-spacing:.02em; }
+      .piece.prom .kanji{ color:#b03024; }
+      .piece.gote{ transform:rotate(180deg); }
+
+      aside{ display:flex; flex-direction:column; gap:14px; }
+      .card{
+        background:var(--panel); border:1px solid var(--line); border-radius:10px;
+        padding:14px 16px; box-shadow:var(--shadow);
+      }
+      .card h2{ font-family:"Noto Serif JP",serif; font-size:1.05rem; margin:0 0 8px; letter-spacing:.06em; }
+      .card h2 .sub{ font-size:.75rem; color:var(--ink2); font-family:"Noto Sans JP",sans-serif; letter-spacing:0; }
+      .pieceinfo{ display:flex; gap:14px; }
+      .mini{
+        display:grid; grid-template-columns:repeat(5,26px); grid-template-rows:repeat(5,26px);
+        gap:2px; flex:none; margin-top:2px;
+      }
+      .mini div{
+        background:var(--panel2); border:1px solid var(--line); border-radius:3px;
+        display:flex; align-items:center; justify-content:center; font-size:.8rem; color:var(--ink2);
+      }
+      .mini div.reach{ background:#cfe6cf; color:#2e6e3e; font-weight:700; }
+      @media (prefers-color-scheme: dark){ .mini div.reach{ background:#274a2e; color:#9fe0a8; } }
+      .mini div.center{
+        background:linear-gradient(180deg,#fdf3cf,var(--piece)); color:var(--piece-ink);
+        font-family:"Noto Serif JP",serif; font-weight:900; font-size:1rem; border-color:var(--piece-edge);
+      }
+      .pieceinfo .txt{ min-width:0; }
+      .pieceinfo .pname{ font-weight:700; font-size:1.02rem; }
+      .pieceinfo .pname .promtag{ color:var(--accent); font-size:.8rem; }
+      .pieceinfo p{ margin:.35em 0; font-size:.9rem; }
+      .pieceinfo .tip{
+        background:var(--panel2); border-radius:8px; padding:8px 10px; font-size:.87rem; margin-top:8px;
+      }
+      .pieceinfo .tip b{ color:var(--accent2); }
+      .empty-note{ color:var(--ink2); font-size:.9rem; }
+      .kifu{
+        max-height:220px; overflow:auto; font-size:.88rem; line-height:1.9;
+        display:grid; grid-template-columns:1fr 1fr; gap:0 14px;
+      }
+      .kifu .mv b{ color:var(--ink2); font-weight:500; margin-right:.4em; font-size:.8rem; }
+      .think{ display:none; align-items:center; gap:8px; font-size:.9rem; color:var(--ink2); }
+      .think.on{ display:flex; }
+      .spin{ width:16px; height:16px; border-radius:50%; border:3px solid var(--line); border-top-color:var(--accent); animation:sp 0.8s linear infinite; flex:none; }
+      @keyframes sp{ to{ transform:rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce){ .spin{ animation:none; } }
+
+      .refgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:10px; margin-top:22px; }
+      .refcard{
+        background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px;
+        cursor:pointer; text-align:left; font-family:inherit; color:var(--ink); width:100%;
+      }
+      .refcard:hover{ border-color:var(--gold); }
+      .refcard .rk{ font-family:"Noto Serif JP",serif; font-weight:900; font-size:1.3rem; }
+      .refcard .rk .to{ color:var(--accent); font-size:.95rem; margin-left:.3em; }
+      .refcard .rn{ font-weight:700; font-size:.88rem; }
+      .refcard .rd{ font-size:.78rem; color:var(--ink2); line-height:1.5; }
+      .refcard .mini{ grid-template-columns:repeat(5,17px); grid-template-rows:repeat(5,17px); margin:6px 0; }
+      .refcard .mini div{ font-size:.55rem; border-radius:2px; }
+      .refcard .mini div.center{ font-size:.68rem; }
+      .sec-title{ font-family:"Noto Serif JP",serif; font-size:1.25rem; margin:30px 0 4px; letter-spacing:.08em; }
+      .sec-lead{ color:var(--ink2); font-size:.92rem; margin:0 0 6px; }
+      .tactics{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; margin-top:12px; }
+      .tactic{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+      .tactic h3{ margin:0 0 4px; font-size:.98rem; }
+      .tactic h3 .no{ color:var(--accent); font-family:"Noto Serif JP",serif; margin-right:.4em; }
+      .tactic p{ margin:0; font-size:.87rem; color:var(--ink2); }
+
+      .overlay{
+        position:fixed; inset:0; background:rgba(20,12,4,.55); display:none;
+        align-items:center; justify-content:center; z-index:50; padding:16px;
+      }
+      .overlay.on{ display:flex; }
+      .dialog{
+        background:var(--panel); color:var(--ink); border-radius:12px; padding:22px;
+        max-width:380px; width:100%; text-align:center; box-shadow:var(--shadow);
+      }
+      .dialog h2{ font-family:"Noto Serif JP",serif; margin:0 0 8px; font-size:1.3rem; }
+      .dialog p{ margin:.4em 0 14px; font-size:.93rem; color:var(--ink2); }
+      .dialog .row{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+      .dialog .row .btn{ min-width:120px; padding:10px 16px; font-size:1rem; }
+      footer{ margin-top:34px; color:var(--ink2); font-size:.82rem; text-align:center; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="topbar">
+        <h1>将棋<small>コンピュータ対戦（中級）／ 駒の動き解説つき</small></h1>
+        <div class="controls">
+          <button class="btn primary" id="btnNew" type="button">最初から対局</button>
+          <button class="btn" id="btnUndo" type="button">待った（1手戻す）</button>
+          <button class="btn" id="btnResign" type="button">投了する</button>
+        </div>
+      </div>
+
+      <div class="layout">
+        <div>
+          <div class="playerbar" id="barGote">
+            <span class="who"><span class="mark">☖</span> 後手・コンピュータ</span>
+            <div class="hand" id="handGote"><span class="none">持ち駒なし</span></div>
+          </div>
+
+          <div class="boardzone">
+            <p class="status" id="status">あなたの手番です。駒をタップしてください。</p>
+            <div class="boardframe">
+              <div class="files" aria-hidden="true"><span>9</span><span>8</span><span>7</span><span>6</span><span>5</span><span>4</span><span>3</span><span>2</span><span>1</span></div>
+              <div class="boardrow">
+                <div class="board" id="board" role="grid" aria-label="将棋盤"></div>
+                <div class="ranks" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>七</span><span>八</span><span>九</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="playerbar" id="barSente">
+            <span class="who"><span class="mark">☗</span> 先手・あなた</span>
+            <div class="hand" id="handSente"><span class="none">持ち駒なし</span></div>
+          </div>
+        </div>
+
+        <aside>
+          <section class="card" aria-label="駒の動き解説">
+            <h2>駒の動き <span class="sub">― 駒を選ぶと図と説明が出ます</span></h2>
+            <div id="pieceInfo"><p class="empty-note">盤の駒や持ち駒をタップすると、その駒の動ける方向を図で示し、中級者向けの使い方も解説します。相手の駒を選んでも動きを確認できます。</p></div>
+          </section>
+
+          <section class="card" aria-label="対局情報">
+            <h2>対局情報</h2>
+            <p style="margin:.2em 0;font-size:.92rem;"><span id="moveCount">手数：0手目</span>　／　相手の強さ：中級</p>
+            <p class="think" id="think"><span class="spin"></span>コンピュータが考え中…</p>
+            <h2 style="margin-top:12px;">棋譜</h2>
+            <div class="kifu" id="kifu"><span class="empty-note">まだ指し手がありません</span></div>
+          </section>
+        </aside>
+      </div>
+
+      <h2 class="sec-title">駒の動き 早見表</h2>
+      <p class="sec-lead">全14種。カードをタップすると、上の「駒の動き」欄に詳しい説明が出ます。対局の合間の確認にもどうぞ。</p>
+      <div class="refgrid" id="refGrid"></div>
+
+      <h2 class="sec-title">中級者の指し回し ― 覚えたい4つの感覚</h2>
+      <div class="tactics">
+        <div class="tactic"><h3><span class="no">一</span>成れる手は価値が高い</h3><p>敵陣に入れる手は、駒の価値そのものが跳ね上がります。特に飛車・角の成り込みは一気に形勢が動くので、相手の守りの薄い筋を常に探しましょう。</p></div>
+        <div class="tactic"><h3><span class="no">二</span>取れる駒は「損得」で見る</h3><p>歩1枚と銀1枚の交換は損です。取る前に「自分の何を取られるか」まで読むのが中級の分かれ目。タダで取れる駒でも、罠のことがあります。</p></div>
+        <div class="tactic"><h3><span class="no">三</span>王手は追う手、詰めは逃げ場から</h3><p>やみくもな王手は相手の王を安全な場所へ逃がすだけです。王の逃げ道を先にふさぐ駒（頭金・腹銀など）から考えると詰みが見えてきます。</p></div>
+        <div class="tactic"><h3><span class="no">四</span>持ち駒は「打つ場所」が命</h3><p>桂は相手の金の頭、角は王の斜め、歩は継ぎ歩の攻め筋。持ち駒は盤上の駒より自由が利く分、打つ一手の質が勝敗を分けます。</p></div>
+      </div>
+
+      <footer>ルール：二歩・行き場のない駒の打ち／移動・打ち歩詰めは指せません。王手がかかると逃げる手だけが選べます。</footer>
+    </div>
+
+    <div class="overlay" id="promoOverlay">
+      <div class="dialog">
+        <h2 id="promoTitle">成りますか？</h2>
+        <p id="promoText">敵陣に入ります。成ると動きが強くなりますが、戻れなくなります。</p>
+        <div class="row">
+          <button class="btn primary" id="btnPromote" type="button">成る</button>
+          <button class="btn" id="btnNoPromote" type="button">成らない</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="endOverlay">
+      <div class="dialog">
+        <h2 id="endTitle">対局終了</h2>
+        <p id="endText"></p>
+        <div class="row">
+          <button class="btn primary" id="btnAgain" type="button">もう一局</button>
+          <button class="btn" id="btnCloseEnd" type="button">盤面を見る</button>
+        </div>
+      </div>
+    </div>
+
+<script>
+"use strict";
+/* ================= 駒データ ================= */
+var INFO = {
+  OU:{kanji:"王", name:"玉将（王将）", read:"ぎょくしょう", desc:"上下左右・斜めの全方向に1マス。負けたら終わりの最も大切な駒です。", tip:"中盤までは囲いの中に置き、終盤は自ら攻めに加わる「入玉」も視野に。攻め駒が王に近づいたら、まず逃げ道を確保しましょう。"},
+  HI:{kanji:"飛", name:"飛車", read:"ひしゃ", desc:"縦と横に、何マスでもまっすぐ進めます。止まるのも、相手の駒を取るのも自由です。", tip:"大駒の要。横の利きで相手の攻めをけん制しつつ、敵陣への成り込み（龍）を狙うのが基本の使い方です。"},
+  RY:{kanji:"龍", name:"龍王（成った飛車）", read:"りゅうおう", desc:"飛車の動きに加え、斜めにも1マス進めます。将棋で最も強い駒のひとつです。", tip:"自陣に戻して守りに使う「引き龍」も強力。王の近くに置けば攻守両面で働きます。"},
+  KA:{kanji:"角", name:"角行", read:"かくぎょう", desc:"斜めに、何マスでも進めます。縦横には動けません。", tip:"遠くから王の斜め筋をにらむのが本領。角交換から持ち角にする展開は、相手の囲いを崩す定番の入り口です。"},
+  UM:{kanji:"馬", name:"龍馬（成った角）", read:"りゅうま", desc:"角の動きに加え、縦と横にも1マス進めます。", tip:"王の近くで馬を作ると鉄壁の守りになります。馬は寄せの主役でもあり、王の斜めに利かすと逃げ場が消えます。"},
+  KI:{kanji:"金", name:"金将", read:"きんしょう", desc:"前・斜め前・横・後ろの6方向に1マス。斜め後ろへは行けません。", tip:"囲いの中心であり、詰めの主役（頭金）。攻めでは相手の駒を上から押さえる「金のさばき」を覚えると手が広がります。"},
+  GI:{kanji:"銀", name:"銀将", read:"ぎんしょう", desc:"前と斜めの5方向に1マス。真横と真後ろへは行けません。", tip:"「銀は千鳥に使え」と言われるほど斜めの動きが命。棒銀や腰掛け銀など、銀の進み方がそのまま戦法になります。"},
+  NG:{kanji:"成銀", name:"成銀（成った銀）", read:"なりぎん", desc:"成ると金と同じ動き（前・斜め前・横・後ろの6方向に1マス）になります。取られると銀に戻ります。", tip:"敵陣で成った銀は、そのまま寄せの駒として働きます。わざと成らずに斜めに引ける銀のまま使う手も終盤では重要です。"},
+  KE:{kanji:"桂", name:"桂馬", read:"けいま", desc:"前の2マス先・左右1マスずれた位置へ跳びます。途中の駒は飛び越えられます。将棋で唯一「跳ぶ」駒です。", tip:"「桂の高跳び歩の餌食」には注意。高跳びは歩で止められますが、あえて跳んで攻めの起点にするのが中級の感覚です。"},
+  NK:{kanji:"成桂", name:"成桂（成った桂）", read:"なりけい", desc:"成ると金と同じ動きになります。取られると桂に戻ります。", tip:"敵陣深くで成った桂は金の代わり。桂のままでは下がれないので、成るタイミングを間違えると死に駒になります。"},
+  KY:{kanji:"香", name:"香車", read:"きょうしゃ", desc:"前にだけ、何マスでもまっすぐ進めます。下がれません。", tip:"端攻めの主役。1筋・9筋に香と歩をそろえると、相手の端の守りを崩す起点になります。"},
+  NY:{kanji:"成香", name:"成香（成った香）", read:"なりきょう", desc:"成ると金と同じ動きになります。取られると香に戻ります。", tip:"端から成り込んだ香は王への寄せに直結します。下がれない香の弱点が消えるのが大きな変化です。"},
+  FU:{kanji:"歩", name:"歩兵", read:"ふひょう", desc:"前に1マスだけ進めます。最も枚数が多い駒ですが、攻めの潤滑油です。", tip:"歩は「手筋の宝庫」。継ぎ歩・垂れ歩・たたきの歩など歩の手筋を使いこなすことが、中級から上級への近道です。"},
+  TO:{kanji:"と", name:"と金（成った歩）", read:"ときん", desc:"成ると金と同じ動きになります。取られると歩に戻ります。", tip:"「と金の遅早」は格言通り、王に迫ったと金は金以上の圧力。王の頭のと金は詰めの形そのものです。"}
+};
+var PROMOTE = {FU:"TO", KY:"NY", KE:"NK", GI:"NG", KA:"UM", HI:"RY"};
+var BASE = {TO:"FU", NY:"KY", NK:"KE", NG:"GI", UM:"KA", RY:"HI"};
+var PROMOTED = {TO:1, NY:1, NK:1, NG:1, UM:1, RY:1};
+var VALUE = {FU:100, KY:320, KE:340, GI:520, KI:640, KA:880, HI:1050, TO:640, NY:640, NK:640, NG:640, UM:1180, RY:1350, OU:0};
+var HANDVAL = {FU:115, KY:340, KE:360, GI:550, KI:670, KA:920, HI:1100};
+var ORDER = ["HI","KA","KI","GI","KE","KY","FU"];
+var KNUM = ["","１","２","３","４","５","６","７","８","９"];
+var KRANK = ["","一","二","三","四","五","六","七","八","九"];
+
+/* 動き定義（先手向き：前は y-1） */
+function moveDef(type){
+  switch(type){
+    case "FU": return {step:[[0,-1]], slide:[]};
+    case "KY": return {step:[], slide:[[0,-1]]};
+    case "KE": return {step:[[-1,-2],[1,-2]], slide:[]};
+    case "GI": return {step:[[0,-1],[-1,-1],[1,-1],[-1,1],[1,1]], slide:[]};
+    case "KI": case "TO": case "NY": case "NK": case "NG":
+      return {step:[[0,-1],[-1,-1],[1,-1],[-1,0],[1,0],[0,1]], slide:[]};
+    case "OU": return {step:[[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]], slide:[]};
+    case "KA": return {step:[], slide:[[-1,-1],[1,-1],[-1,1],[1,1]]};
+    case "UM": return {step:[[0,-1],[0,1],[-1,0],[1,0]], slide:[[-1,-1],[1,-1],[-1,1],[1,1]]};
+    case "HI": return {step:[], slide:[[0,-1],[0,1],[-1,0],[1,0]]};
+    case "RY": return {step:[[-1,-1],[1,-1],[-1,1],[1,1]], slide:[[0,-1],[0,1],[-1,0],[1,0]]};
+  }
+  return {step:[], slide:[]};
+}
+function dirFor(d, owner){ return owner===0 ? d : [-d[0], -d[1]]; }
+
+/* ================= 局面 ================= */
+var board, hands, turn, histStack, moveLog, gameOver, lastMove;
+function emptyBoard(){ var b=[]; for(var y=0;y<9;y++){ b.push([null,null,null,null,null,null,null,null,null]); } return b; }
+function initGame(){
+  board = emptyBoard(); hands = [{}, {}]; turn = 0; histStack = []; moveLog = []; gameOver = false; lastMove = null;
+  ORDER.concat(["OU"]).forEach(function(t){ hands[0][t]=0; hands[1][t]=0; });
+  var back = ["KY","KE","GI","KI","OU","KI","GI","KE","KY"];
+  for(var x=0;x<9;x++){
+    board[0][x] = {t:back[x], o:1};
+    board[8][x] = {t:back[x], o:0};
+    board[2][x] = {t:"FU", o:1};
+    board[6][x] = {t:"FU", o:0};
+  }
+  board[1][7] = {t:"KA", o:1}; board[1][1] = {t:"HI", o:1};
+  board[7][1] = {t:"KA", o:0}; board[7][7] = {t:"HI", o:0};
+  sel = null; selHand = null; legalCache = [];
+  renderAll();
+  setStatus("あなたの手番です。駒をタップしてください。");
+}
+function cloneState(){
+  return {
+    b: board.map(function(r){ return r.map(function(c){ return c?{t:c.t,o:c.o}:null; }); }),
+    h: [Object.assign({},hands[0]), Object.assign({},hands[1])],
+    t: turn, log: moveLog.slice(), last: lastMove
+  };
+}
+function restoreState(s){
+  board = s.b; hands = s.h; turn = s.t; moveLog = s.log; lastMove = s.last; gameOver = false;
+}
+
+/* ================= 合法手生成 ================= */
+function inB(x,y){ return x>=0 && x<9 && y>=0 && y<9; }
+function pseudoMoves(bd, x, y){
+  var p = bd[y][x]; if(!p) return [];
+  var def = moveDef(p.t), res = [], i, d, nx, ny;
+  for(i=0;i<def.step.length;i++){
+    d = dirFor(def.step[i], p.o); nx = x+d[0]; ny = y+d[1];
+    if(inB(nx,ny) && (!bd[ny][nx] || bd[ny][nx].o !== p.o)) res.push({fx:x, fy:y, tx:nx, ty:ny});
+  }
+  for(i=0;i<def.slide.length;i++){
+    d = dirFor(def.slide[i], p.o); nx = x; ny = y;
+    while(true){
+      nx += d[0]; ny += d[1];
+      if(!inB(nx,ny)) break;
+      if(bd[ny][nx]){ if(bd[ny][nx].o !== p.o) res.push({fx:x, fy:y, tx:nx, ty:ny}); break; }
+      res.push({fx:x, fy:y, tx:nx, ty:ny});
+    }
+  }
+  /* 成り・強制成りの展開 */
+  var out = [];
+  res.forEach(function(m){
+    var canProm = !!PROMOTE[p.t] && (inZone(m.fy,p.o) || inZone(m.ty,p.o));
+    var mustProm = !!PROMOTE[p.t] && ((p.t==="FU"||p.t==="KY") && m.ty===(p.o===0?0:8) || p.t==="KE" && (p.o===0 ? m.ty<=1 : m.ty>=7));
+    if(canProm && !mustProm){ out.push(Object.assign({},m,{prom:false})); out.push(Object.assign({},m,{prom:true})); }
+    else if(mustProm){ out.push(Object.assign({},m,{prom:true})); }
+    else out.push(Object.assign({},m,{prom:false}));
+  });
+  return out;
+}
+function inZone(y, owner){ return owner===0 ? y<=2 : y>=6; }
+function deadRank(type, y, owner){
+  if(type==="FU"||type==="KY") return owner===0 ? y===0 : y===8;
+  if(type==="KE") return owner===0 ? y<=1 : y>=7;
+  return false;
+}
+function dropMoves(bd, hd, owner){
+  var res = [];
+  ORDER.forEach(function(t){
+    if(!(hd[owner] && hd[owner][t])) return;
+    for(var y=0;y<9;y++) for(var x=0;x<9;x++){
+      if(bd[y][x]) continue;
+      if(deadRank(t,y,owner)) continue;
+      if(t==="FU"){
+        var nifu = false;
+        for(var yy=0;yy<9;yy++){ var c=bd[yy][x]; if(c && c.o===owner && c.t==="FU"){ nifu=true; break; } }
+        if(nifu) continue;
+      }
+      res.push({drop:t, tx:x, ty:y, prom:false});
+    }
+  });
+  return res;
+}
+function kingPos(bd, owner){
+  for(var y=0;y<9;y++) for(var x=0;x<9;x++){ var c=bd[y][x]; if(c && c.t==="OU" && c.o===owner) return {x:x,y:y}; }
+  return null;
+}
+function isAttacked(bd, x, y, byOwner){
+  for(var yy=0;yy<9;yy++) for(var xx=0;xx<9;xx++){
+    var c = bd[yy][xx]; if(!c || c.o!==byOwner) continue;
+    var def = moveDef(c.t), i, d, nx, ny;
+    for(i=0;i<def.step.length;i++){ d=dirFor(def.step[i],c.o); if(xx+d[0]===x && yy+d[1]===y) return true; }
+    for(i=0;i<def.slide.length;i++){
+      d=dirFor(def.slide[i],c.o); nx=xx; ny=yy;
+      while(true){ nx+=d[0]; ny+=d[1]; if(!inB(nx,ny)) break; if(nx===x&&ny===y) return true; if(bd[ny][nx]) break; }
+    }
+  }
+  return false;
+}
+function inCheck(bd, owner){ var k = kingPos(bd, owner); return k ? isAttacked(bd, k.x, k.y, 1-owner) : false; }
+function applyOn(bd, hd, m, owner){
+  var nb = bd.map(function(r){ return r.map(function(c){ return c?{t:c.t,o:c.o}:null; }); });
+  var nh = [Object.assign({},hd[0]), Object.assign({},hd[1])];
+  if(m.drop){
+    nh[owner][m.drop]--;
+    nb[m.ty][m.tx] = {t:m.drop, o:owner};
+  } else {
+    var p = nb[m.fy][m.fx];
+    var cap = nb[m.ty][m.tx];
+    if(cap) nh[owner][BASE[cap.t]||cap.t]++;
+    nb[m.ty][m.tx] = {t: m.prom ? PROMOTE[p.t] : p.t, o:owner};
+    nb[m.fy][m.fx] = null;
+  }
+  return {b:nb, h:nh};
+}
+function legalMoves(bd, hd, owner){
+  var res = [], x, y;
+  for(y=0;y<9;y++) for(x=0;x<9;x++){ var c=bd[y][x]; if(c && c.o===owner) res = res.concat(pseudoMoves(bd,x,y)); }
+  res = res.concat(dropMoves(bd, hd, owner));
+  return res.filter(function(m){
+    var s = applyOn(bd, hd, m, owner);
+    if(inCheck(s.b, owner)) return false;
+    if(m.drop==="FU"){ /* 打ち歩詰め禁止（近似：歩打ちで完全な詰みになる手は不可） */
+      if(inCheck(s.b, 1-owner) && legalMovesExist(s.b, s.h, 1-owner)===false){
+        /* 相手に受けが一切ない場合は打ち歩詰めとして禁止。ただし歩を取る受けも含め判定済み */
+        return false;
+      }
+    }
+    return true;
+  });
+}
+function legalMovesExist(bd, hd, owner){
+  var x, y, all = [];
+  for(y=0;y<9;y++) for(x=0;x<9;x++){ var c=bd[y][x]; if(c && c.o===owner) all = all.concat(pseudoMoves(bd,x,y)); }
+  all = all.concat(dropMoves(bd, hd, owner));
+  for(var i=0;i<all.length;i++){ var s = applyOn(bd, hd, all[i], owner); if(!inCheck(s.b, owner)) return true; }
+  return false;
+}
+
+/* ================= AI（中級） ================= */
+var nodes = 0;
+function evaluate(bd, hd){
+  var s = 0, x, y, c;
+  for(y=0;y<9;y++) for(x=0;x<9;x++){
+    c = bd[y][x]; if(!c) continue;
+    var v = VALUE[c.t];
+    /* 前進ボーナス・王の位置 */
+    if(c.t==="FU") v += (c.o===0 ? (8-y) : y) * 4;
+    if(c.t==="OU"){ /* 王の周りに味方がいると少し安全 */
+      var guard = 0;
+      for(var dy=-1;dy<=1;dy++) for(var dx=-1;dx<=1;dx++){ var nx=x+dx, ny=y+dy; if(inB(nx,ny)){ var g=bd[ny][nx]; if(g && g.o===c.o && g.t!=="OU") guard++; } }
+      v += guard * 18;
+    }
+    if(c.o===0) s += v; else s -= v;
+  }
+  ORDER.forEach(function(t){ s += (hd[0][t]||0)*HANDVAL[t] - (hd[1][t]||0)*HANDVAL[t]; });
+  return s;
+}
+function moveScore(m, bd){
+  var s = 0, cap = m.drop ? null : bd[m.ty][m.tx];
+  if(cap) s += VALUE[cap.t]*10 - (m.drop?0:VALUE[bd[m.fy][m.fx].t]);
+  if(m.prom) s += 400;
+  if(m.drop) s += 50;
+  return s;
+}
+function negamax(bd, hd, owner, depth, alpha, beta){
+  nodes++;
+  if(nodes > 90000) return owner===0 ? evaluate(bd,hd) : -evaluate(bd,hd);
+  if(depth===0) return owner===0 ? evaluate(bd,hd) : -evaluate(bd,hd);
+  var moves = legalMoves(bd, hd, owner);
+  if(moves.length===0) return -100000 - depth*100;
+  moves.sort(function(a,b){ return moveScore(b,bd)-moveScore(a,bd); });
+  var best = -Infinity;
+  for(var i=0;i<moves.length;i++){
+    var s = applyOn(bd, hd, moves[i], owner);
+    var sc = -negamax(s.b, s.h, 1-owner, depth-1, -beta, -alpha);
+    if(sc > best) best = sc;
+    if(best > alpha) alpha = best;
+    if(alpha >= beta) break;
+  }
+  return best;
+}
+function aiChooseMove(){
+  var moves = legalMoves(board, hands, 1);
+  if(!moves.length) return null;
+  moves.sort(function(a,b){ return moveScore(b,board)-moveScore(a,board); });
+  nodes = 0;
+  var scored = [], best = -Infinity;
+  var alpha = -Infinity;
+  for(var i=0;i<moves.length;i++){
+    var s = applyOn(board, hands, moves[i], 1);
+    var sc = -negamax(s.b, s.h, 0, 2, -Infinity, Infinity);
+    scored.push({m:moves[i], sc:sc});
+    if(sc > best) best = sc;
+  }
+  /* 中級らしく：最善手付近（40点以内）からランダムに選ぶ */
+  var near = scored.filter(function(e){ return e.sc >= best - 40; });
+  return near[Math.floor(Math.random()*near.length)].m;
+}
+
+/* ================= 画面描画 ================= */
+var boardEl = document.getElementById("board");
+var sel = null, selHand = null, legalCache = [];
+var sqEls = [];
+(function buildSquares(){
+  for(var y=0;y<9;y++) for(var x=0;x<9;x++){
+    var d = document.createElement("div");
+    d.className = "sq"; d.setAttribute("role","gridcell");
+    d.dataset.x = x; d.dataset.y = y;
+    if((x===3||x===6) && (y===3||y===6)){ var dot=document.createElement("span"); dot.className="dot"; d.appendChild(dot); }
+    d.addEventListener("click", (function(xx,yy){ return function(){ onSquare(xx,yy); }; })(x,y));
+    boardEl.appendChild(d); sqEls.push(d);
+  }
+})();
+function pieceHTML(p, ownerKing){
+  var info = INFO[p.t];
+  var kanji = p.t==="OU" ? (p.o===0 ? "王" : "玉") : info.kanji;
+  var cls = kanji.length>1 ? "two" : "one";
+  return '<div class="piece'+(p.o===1?" gote":"")+(PROMOTED[p.t]?" prom":"")+'"><span class="shape"></span><span class="kanji '+cls+'">'+kanji+'</span></div>';
+}
+function renderBoard(){
+  for(var i=0;i<sqEls.length;i++){
+    var x = +sqEls[i].dataset.x, y = +sqEls[i].dataset.y;
+    var p = board[y][x];
+    var base = sqEls[i].querySelector(".dot");
+    sqEls[i].innerHTML = "";
+    if(base) sqEls[i].appendChild(base);
+    if((x===3||x===6)&&(y===3||y===6) && !sqEls[i].querySelector(".dot")){ var dot=document.createElement("span"); dot.className="dot"; sqEls[i].appendChild(dot); }
+    if(p) sqEls[i].insertAdjacentHTML("beforeend", pieceHTML(p));
+    sqEls[i].classList.toggle("sel", !!sel && sel.x===x && sel.y===y);
+    sqEls[i].classList.toggle("last", !!lastMove && lastMove.tx===x && lastMove.ty===y);
+    var lg = null;
+    for(var j=0;j<legalCache.length;j++){ if(legalCache[j].tx===x && legalCache[j].ty===y){ lg = legalCache[j]; break; } }
+    sqEls[i].classList.toggle("legal", !!lg);
+    sqEls[i].classList.toggle("capture", !!lg && !lg.drop && !!board[y][x]);
+  }
+}
+function renderHands(){
+  [0,1].forEach(function(o){
+    var el = document.getElementById(o===0?"handSente":"handGote");
+    el.innerHTML = "";
+    var any = false;
+    ORDER.forEach(function(t){
+      var n = hands[o][t]||0; if(!n) return; any = true;
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "handpiece" + (o===0 && selHand===t ? " selected" : "");
+      b.innerHTML = '<span class="shape"></span><span class="kanji">'+INFO[t].kanji+'</span>' + (n>1?'<span class="cnt">'+n+'</span>':"");
+      b.setAttribute("aria-label", INFO[t].name + " " + n + "枚");
+      if(o===0){
+        b.addEventListener("click", (function(tt){ return function(){ onHand(tt); }; })(t));
+      } else {
+        b.disabled = true;
+        b.addEventListener("click", (function(tt){ return function(){ showInfo(tt); }; })(t));
+      }
+      el.appendChild(b);
+    });
+    if(!any) el.innerHTML = '<span class="none">持ち駒なし</span>';
+  });
+  document.getElementById("barSente").classList.toggle("turn", turn===0 && !gameOver);
+  document.getElementById("barGote").classList.toggle("turn", turn===1 && !gameOver);
+}
+function renderKifu(){
+  var el = document.getElementById("kifu");
+  document.getElementById("moveCount").textContent = "手数：" + moveLog.length + "手目";
+  if(!moveLog.length){ el.innerHTML = '<span class="empty-note">まだ指し手がありません</span>'; return; }
+  el.innerHTML = moveLog.map(function(s,i){ return '<span class="mv"><b>'+(i+1)+'.</b>'+s+'</span>'; }).join("");
+  el.scrollTop = el.scrollHeight;
+}
+function renderAll(){ renderBoard(); renderHands(); renderKifu(); }
+function setStatus(html){ document.getElementById("status").innerHTML = html; }
+
+/* ================= 駒情報パネル ================= */
+function miniDiagram(type){
+  var def = moveDef(type), reach = {};
+  def.step.forEach(function(d){ reach[(2+d[0])+","+(2+d[1])] = 1; });
+  def.slide.forEach(function(d){ var x=2,y=2; while(true){ x+=d[0]; y+=d[1]; if(x<0||x>4||y<0||y>4) break; reach[x+","+y]=1; } });
+  var html = '<div class="mini" aria-hidden="true">';
+  for(var y=0;y<5;y++) for(var x=0;x<5;x++){
+    if(x===2&&y===2) html += '<div class="center">'+INFO[type].kanji+'</div>';
+    else if(reach[x+","+y]) html += '<div class="reach">●</div>';
+    else html += '<div>・</div>';
+  }
+  return html + "</div>";
+}
+function showInfo(type){
+  var info = INFO[type];
+  var promLine = PROMOTE[type] ? '<p>成ると <b>'+INFO[PROMOTE[type]].name+'</b> になります。</p>' : (BASE[type] ? '<p>取られると <b>'+INFO[BASE[type]].name+'</b> に戻ります。</p>' : "");
+  document.getElementById("pieceInfo").innerHTML =
+    '<div class="pieceinfo">' + miniDiagram(type) +
+    '<div class="txt"><div class="pname">'+info.name+' <span style="color:var(--ink2);font-size:.82rem;">'+info.read+'</span></div>' +
+    '<p>'+info.desc+'</p>' + promLine +
+    '<div class="tip"><b>中級の使い方：</b>'+info.tip+'</div></div></div>';
+}
+
+/* ================= 指し手の実行 ================= */
+function moveNotation(m, owner){
+  var piece = m.drop ? m.drop : board[m.fy][m.fx].t;
+  var mark = owner===0 ? "☗" : "☖";
+  var s = mark + KNUM[9-m.tx] + KRANK[m.ty] + INFO[piece].kanji;
+  if(m.drop) s += "打";
+  else if(m.prom) s += "成";
+  return s;
+}
+function doMove(m, owner){
+  histStack.push(cloneState());
+  var notation = moveNotation(m, owner);
+  var s = applyOn(board, hands, m, owner);
+  board = s.b; hands = s.h;
+  lastMove = m; moveLog.push(notation);
+  sel = null; selHand = null; legalCache = [];
+  turn = 1 - owner;
+  renderAll();
+  var opp = turn;
+  var checked = inCheck(board, opp);
+  var has = legalMovesExist(board, hands, opp) && !(opp===1 && pawnDropMateOnly(board,hands,opp));
+  var oppMoves = legalMoves(board, hands, opp);
+  if(oppMoves.length===0){
+    gameOver = true;
+    renderHands();
+    if(owner===0){ setStatus("詰みです。あなたの勝ちです！"); showEnd("あなたの勝ち", "コンピュータの王を詰ませました。"+moveLog.length+"手で対局が終わりました。"); }
+    else { setStatus("詰まされました。コンピュータの勝ちです。"); showEnd("コンピュータの勝ち", "あなたの王が詰みました。"+moveLog.length+"手の対局でした。「もう一局」から再戦できます。"); }
+    return;
+  }
+  if(turn===1){
+    setStatus(checked ? '<span class="check">王手がかかりました。</span>コンピュータが考えています…' : "コンピュータが考えています…");
+    document.getElementById("think").classList.add("on");
+    setTimeout(function(){
+      document.getElementById("think").classList.remove("on");
+      if(gameOver) return;
+      var mv = aiChooseMove();
+      if(!mv){ gameOver = true; setStatus("コンピュータに指せる手がありません。あなたの勝ちです！"); showEnd("あなたの勝ち","コンピュータに合法手がなくなりました。"); return; }
+      doMove(mv, 1);
+    }, 450);
+  } else {
+    setStatus(checked ? '<span class="check">王手！</span> 王を守ってください。' : "あなたの手番です。");
+  }
+}
+function pawnDropMateOnly(){ return false; }
+
+/* ================= 入力処理 ================= */
+var pendingPromo = null;
+function currentLegalForSelection(){
+  var all = legalMoves(board, hands, 0);
+  if(sel) return all.filter(function(m){ return !m.drop && m.fx===sel.x && m.fy===sel.y; });
+  if(selHand) return all.filter(function(m){ return m.drop===selHand; });
+  return [];
+}
+function tryPlayerMove(m){
+  var variants = legalCache.filter(function(v){ return v.tx===m.tx && v.ty===m.ty; });
+  if(!variants.length) return;
+  var hasProm = variants.some(function(v){ return v.prom; });
+  var hasNoProm = variants.some(function(v){ return !v.prom; });
+  if(hasProm && hasNoProm){
+    pendingPromo = variants;
+    var t = variants[0].drop ? variants[0].drop : board[variants[0].fy][variants[0].fx].t;
+    document.getElementById("promoTitle").textContent = INFO[t].name + " ― 成りますか？";
+    document.getElementById("promoText").textContent = "成ると「"+INFO[PROMOTE[t]].name+"」になり、動きが金と同じ（大駒は強化）になります。成らないと元の動きのままです。";
+    document.getElementById("promoOverlay").classList.add("on");
+    return;
+  }
+  doMove(variants[0], 0);
+}
+function onSquare(x, y){
+  if(gameOver || turn!==0) return;
+  var p = board[y][x];
+  if(sel || selHand){
+    var found = legalCache.some(function(m){ return m.tx===x && m.ty===y; });
+    if(found){ tryPlayerMove({tx:x, ty:y}); return; }
+  }
+  if(p && p.o===0){
+    sel = {x:x, y:y}; selHand = null;
+    legalCache = currentLegalForSelection();
+    showInfo(p.t);
+    renderBoard(); renderHands();
+  } else if(p && p.o===1){
+    showInfo(p.t);
+    sel = null; selHand = null; legalCache = []; renderBoard(); renderHands();
+  } else {
+    sel = null; selHand = null; legalCache = []; renderBoard(); renderHands();
+  }
+}
+function onHand(t){
+  if(gameOver || turn!==0) return;
+  showInfo(t);
+  if(selHand===t){ selHand = null; legalCache = []; }
+  else { selHand = t; sel = null; legalCache = currentLegalForSelection(); }
+  renderBoard(); renderHands();
+}
+document.getElementById("btnPromote").addEventListener("click", function(){
+  document.getElementById("promoOverlay").classList.remove("on");
+  if(pendingPromo){ var m = pendingPromo.filter(function(v){ return v.prom; })[0]; pendingPromo=null; doMove(m,0); }
+});
+document.getElementById("btnNoPromote").addEventListener("click", function(){
+  document.getElementById("promoOverlay").classList.remove("on");
+  if(pendingPromo){ var m = pendingPromo.filter(function(v){ return !v.prom; })[0]; pendingPromo=null; doMove(m,0); }
+});
+
+/* ================= コントロール ================= */
+function showEnd(title, text){
+  document.getElementById("endTitle").textContent = title;
+  document.getElementById("endText").textContent = text;
+  document.getElementById("endOverlay").classList.add("on");
+}
+document.getElementById("btnNew").addEventListener("click", function(){ document.getElementById("endOverlay").classList.remove("on"); initGame(); });
+document.getElementById("btnAgain").addEventListener("click", function(){ document.getElementById("endOverlay").classList.remove("on"); initGame(); });
+document.getElementById("btnCloseEnd").addEventListener("click", function(){ document.getElementById("endOverlay").classList.remove("on"); });
+document.getElementById("btnResign").addEventListener("click", function(){
+  if(gameOver || turn!==0) return;
+  gameOver = true;
+  setStatus("投了しました。コンピュータの勝ちです。");
+  showEnd("投了しました", moveLog.length+"手で投了しました。棋譜を見ながら、どこで形勢が傾いたか振り返ってみましょう。");
+});
+document.getElementById("btnUndo").addEventListener("click", function(){
+  if(turn!==0 || !histStack.length) return;
+  /* 自分の手と相手の応手の2手分戻す（相手だけ指した直後は1手） */
+  var steps = Math.min(histStack.length, moveLog.length % 2 === 0 ? 2 : 1);
+  var s = histStack[histStack.length - steps];
+  histStack = histStack.slice(0, histStack.length - steps);
+  restoreState(s);
+  sel = null; selHand = null; legalCache = [];
+  document.getElementById("endOverlay").classList.remove("on");
+  renderAll();
+  setStatus("待ったしました。あなたの手番です。");
+});
+
+/* ================= 早見表 ================= */
+(function buildRef(){
+  var grid = document.getElementById("refGrid");
+  ["OU","HI","KA","KI","GI","KE","KY","FU","RY","UM","NG","NK","NY","TO"].forEach(function(t){
+    var info = INFO[t];
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "refcard";
+    b.innerHTML = '<div class="rk">'+info.kanji+(PROMOTE[t]?'<span class="to">→ '+INFO[PROMOTE[t]].kanji+'</span>':"")+'</div>' +
+      '<div class="rn">'+info.name+'</div>' + miniDiagram(t) +
+      '<div class="rd">'+info.desc+'</div>';
+    b.addEventListener("click", function(){
+      showInfo(t);
+      document.getElementById("pieceInfo").scrollIntoView({behavior:"smooth", block:"center"});
+    });
+    grid.appendChild(b);
+  });
+})();
+
+initGame();
+showInfo("GI");
+</script>
+  </body>
+</html>
